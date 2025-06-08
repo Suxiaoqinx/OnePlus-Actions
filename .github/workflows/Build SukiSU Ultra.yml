@@ -66,6 +66,14 @@ on:
         description: '内核名称修改(可改中文和emoji)'
         required: true
         default: '-Coolapk@Suxiaoqing'
+      KPM_ext:
+       description: "是否启用KPM补丁修补"
+       required: true
+       type: choice
+       options:
+          - 'true'
+          - 'false'
+       default: 'false'
       lz4kd:
        description: "是否启用lz4kd"
        required: true
@@ -296,9 +304,10 @@ jobs:
           fi
          
       - name: 🛠️ KPM Patching Image Files (KPM 修补 Image 文件)
+        if: ${{ github.event.inputs.KPM_ext == 'true' }}
         run: |
           cd kernel_workspace/kernel_platform/out/msm-kernel-${{ github.event.inputs.CPUD }}-gki/dist
-          curl -LO https://github.com/ShirkNeko/SukiSU_KernelPatch_patch/releases/download/0.11-beta/patch_linux
+          curl -LO https://github.com/ShirkNeko/SukiSU_KernelPatch_patch/releases/download/0.11.4/patch_linux
           chmod +x patch_linux
           ./patch_linux
           rm -f Image
