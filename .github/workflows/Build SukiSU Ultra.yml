@@ -534,7 +534,7 @@ jobs:
           
       - name: 创建发布
         id: create_release
-        uses: softprops/action-gh-release@v4
+        uses: upload-artifact@v4
         with:
           tag_name: "${{ github.event.inputs.FEIL }}"
           name: "${{ github.event.inputs.FEIL }}-${{ env.KSUVER }}"
