@@ -65,7 +65,7 @@ on:
       KERNEL_SUFFIX:
         description: '内核名称修改(可改中文和emoji)'
         required: true
-        default: '-xkool'
+        default: '-Coolapk@Suxiaoqing'
       KPM_ext:
        description: "是否启用KPM补丁修补"
        required: true
@@ -274,68 +274,6 @@ jobs:
          
          # 清理临时目录
          rm -rf ./sched_ext
-         
-         # 验证文件是否正确复制
-         if [[ -d "./common/kernel/sched/ext" ]] || [[ $(find ./common/kernel/sched/ -name "*sched*" -type f | wc -l) -gt 0 ]]; then
-           echo "✅ sched_ext files successfully copied"
-           echo "📋 Files in sched directory:"
-           ls -la ./common/kernel/sched/
-           if [[ -d "./common/kernel/sched/ext" ]]; then
-             echo "📋 Files in sched/ext directory:"
-             ls -la ./common/kernel/sched/ext/
-           fi
-         else
-           echo "⚠️ WARNING: sched_ext files may not have been copied properly, but continuing build..."
-         fi
-
-      - name: 🎮 Extract Wind Gaming Scheduler from Realme GT Neo6
-        if: ${{ github.event.inputs.sched_ext == 'true' }}
-        run: |
-          cd kernel_workspace/kernel_platform/
-          
-          # 克隆Realme GT Neo6内核源码
-          echo "📥 Cloning Realme GT Neo6 kernel source..."
-          git clone https://github.com/realme-kernel-opensource/realme_gtneo6-AndroidV-kernel-source.git realme_source --depth=1
-          
-          # 提取sched_ext相关文件
-          echo "📋 Extracting sched_ext files..."
-          if [[ -d "./realme_source/kernel/sched" ]]; then
-            # 创建目标目录
-            mkdir -p ./common/kernel/sched/ext
-            mkdir -p ./common/include/linux/sched
-            
-            # 复制核心调度器文件
-            if [[ -f "./realme_source/kernel/sched/ext.c" ]]; then
-              cp ./realme_source/kernel/sched/ext.c ./common/kernel/sched/
-              echo "✅ Copied ext.c"
-            fi
-            
-            # 复制头文件
-            if [[ -d "./realme_source/include/linux/sched" ]]; then
-              cp ./realme_source/include/linux/sched/ext.h ./common/include/linux/sched/ 2>/dev/null || true
-              echo "✅ Copied ext.h"
-            fi
-            
-            # 复制BPF相关文件
-            find ./realme_source -name "*sched_ext*" -type f -exec cp {} ./common/kernel/sched/ \; 2>/dev/null || true
-            echo "✅ Copied sched_ext related files"
-            
-            # 检查特定的游戏调度器
-            GAMING_SCHEDULERS=("scx_rustland" "scx_lavd" "scx_bpfland" "scx_simple")
-            for scheduler in "${GAMING_SCHEDULERS[@]}"; do
-              if find ./realme_source -name "$scheduler*" -type f | head -1 >/dev/null 2>&1; then
-                echo "🎮 Found gaming scheduler: $scheduler"
-                find ./realme_source -name "$scheduler*" -type f -exec cp {} ./common/kernel/sched/ \; 2>/dev/null || true
-              fi
-            done
-          else
-            echo "❌ Realme sched directory not found"
-            exit 1
-          fi
-          
-          # 清理临时目录
-          rm -rf ./realme_source
-          echo "✅ Realme GT Neo6 Wind Gaming Scheduler extracted successfully"
 
       - name: 🔧 Apply kernel configurations (应用内核配置)
         run: |
@@ -369,6 +307,7 @@ jobs:
           # Network Performance
           CONFIG_TCP_CONG_ADVANCED=y
           CONFIG_TCP_CONG_BBR=y
+          CONFIG_DEFAULT_BBR=y
           CONFIG_NET_SCH_FQ=y
           CONFIG_TCP_CONG_BIC=n
           CONFIG_TCP_CONG_WESTWOOD=n
@@ -378,10 +317,6 @@ jobs:
           # sched_ext配置
           if [[ "${{ github.event.inputs.sched_ext }}" == "true" ]]; then
             cat >> ./common/arch/arm64/configs/gki_defconfig << 'EOF'
-          
-          # Realme GT Neo6 Wind Gaming Scheduler Configuration
-          CONFIG_SCHED_CLASS_EXT=y
-          CONFIG_SCHED_DEBUG=y
           
           # BPF Support for sched_ext
           CONFIG_BPF=y
