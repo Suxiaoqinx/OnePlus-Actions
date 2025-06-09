@@ -369,6 +369,7 @@ jobs:
           # Network Performance
           CONFIG_TCP_CONG_ADVANCED=y
           CONFIG_TCP_CONG_BBR=y
+          CONFIG_DEFAULT_BBR=y
           CONFIG_NET_SCH_FQ=y
           CONFIG_TCP_CONG_BIC=n
           CONFIG_TCP_CONG_WESTWOOD=n
