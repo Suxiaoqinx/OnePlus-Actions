@@ -521,7 +521,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: AnyKernel3_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}.zip
-          path: ./AnyKernel3/*.zip
+          path: AnyKernel3_*.zip
 
   release:
     needs: build
