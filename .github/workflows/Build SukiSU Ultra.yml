@@ -33,7 +33,7 @@ on:
           - 'oneplus_ace_pro'
           - 'oneplus_10_pro'
           - 'oneplus_ace_3v'
-          - ' '
+          - 'other'
         default: 'oneplus_12'
       CPUD:
         description: "处理器代号"
@@ -112,6 +112,30 @@ jobs:
           remove-haskell: 'true'
           remove-codeql: 'true'
 
+      - name: ✅ Validate inputs (验证输入参数)
+        run: |
+          # 验证内核版本
+          case "${{ github.event.inputs.KERNEL_VERSION }}" in
+            "6.1"|"5.15"|"5.10")
+              echo "Valid kernel version: ${{ github.event.inputs.KERNEL_VERSION }}"
+              ;;
+            *)
+              echo "Unsupported kernel version: ${{ github.event.inputs.KERNEL_VERSION }}"
+              exit 1
+              ;;
+          esac
+          
+          # 验证Android版本
+          case "${{ github.event.inputs.ANDROID_VERSION }}" in
+            "android14"|"android13"|"android12")
+              echo "Valid Android version: ${{ github.event.inputs.ANDROID_VERSION }}"
+              ;;
+            *)
+              echo "Unsupported Android version: ${{ github.event.inputs.ANDROID_VERSION }}"
+              exit 1
+              ;;
+          esac
+
       - name: 📦 Configure Git
         run: |
          git config --global user.name "bulid"
@@ -120,8 +144,7 @@ jobs:
       - name: 📦 Install dependencies (安装依赖)
         run: |
          sudo apt update && sudo apt upgrade -y
-         sudo apt install -y python3 git curl
-         sudo apt install -y python3 git curl ccache
+         sudo apt install -y python3 git curl ccache libelf-dev
          
       - name: 📥 Restore ccache (恢复 ccache 缓存)
         uses: actions/cache@v3
@@ -137,22 +160,22 @@ jobs:
          chmod a+x ~/repo
          sudo mv ~/repo /usr/local/bin/repo
 
-      - name: 📥 Initialize repo and sync （克隆内核源码）
+      - name: 📥 Initialize repo and sync (克隆内核源码)
         run: |
          mkdir kernel_workspace && cd kernel_workspace
          repo init -u https://github.com/Xiaomichael/kernel_manifest.git -b refs/heads/oneplus/${{ github.event.inputs.CPU }} -m ${{ github.event.inputs.FEIL }}.xml --depth=1
          repo sync
-         rm kernel_platform/common/android/abi_gki_protected_exports_* || echo "No protected exports!"
-         rm kernel_platform/msm-kernel/android/abi_gki_protected_exports_* || echo "No protected exports!"
-         sed -i 's/ -dirty//g' kernel_platform/common/scripts/setlocalversion
-         sed -i 's/ -dirty//g' kernel_platform/msm-kernel/scripts/setlocalversion
-         sed -i 's/ -dirty//g' kernel_platform/external/dtc/scripts/setlocalversion
-         sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' kernel_platform/common/scripts/setlocalversion
-         sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' kernel_platform/msm-kernel/scripts/setlocalversion
-         sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' kernel_platform/external/dtc/scripts/setlocalversion
-         sed -i '$s|echo "\$res"|echo "-oki${{ github.event.inputs.KERNEL_SUFFIX }}-v$(date +%Y%m%d)"|' kernel_platform/common/scripts/setlocalversion            
-         sed -i '$s|echo "\$res"|echo "-oki${{ github.event.inputs.KERNEL_SUFFIX }}-v$(date +%Y%m%d)"|' kernel_platform/msm-kernel/scripts/setlocalversion
-         sed -i '$s|echo "\$res"|echo "-oki${{ github.event.inputs.KERNEL_SUFFIX }}-v$(date +%Y%m%d)"|' kernel_platform/external/dtc/scripts/setlocalversion
+         rm -f kernel_platform/common/android/abi_gki_protected_exports_* || echo "No protected exports!"
+         rm -f kernel_platform/msm-kernel/android/abi_gki_protected_exports_* || echo "No protected exports!"
+         
+         # 修改setlocalversion脚本
+         for script in kernel_platform/common/scripts/setlocalversion kernel_platform/msm-kernel/scripts/setlocalversion kernel_platform/external/dtc/scripts/setlocalversion; do
+           if [[ -f "$script" ]]; then
+             sed -i 's/ -dirty//g' "$script"
+             sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' "$script"
+             sed -i '$s|echo "\$res"|echo "-oki${{ github.event.inputs.KERNEL_SUFFIX }}-v$(date +%Y%m%d)"|' "$script"
+           fi
+         done
           
       - name: ⚙️ Set up SukiSU Ultra (配置 SukiSU Ultra)
         run: |
@@ -171,135 +194,269 @@ jobs:
           git clone https://github.com/Xiaomichael/kernel_patches.git
           git clone https://github.com/ShirkNeko/SukiSU_patch.git
           cd kernel_platform
+          
           # Copy SUSFS patches
-          cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ github.event.inputs.ANDROID_VERSION }}-${{ github.event.inputs.KERNEL_VERSION }}.patch ./common/
+          if [[ -f "../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ github.event.inputs.ANDROID_VERSION }}-${{ github.event.inputs.KERNEL_VERSION }}.patch" ]]; then
+            cp "../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ github.event.inputs.ANDROID_VERSION }}-${{ github.event.inputs.KERNEL_VERSION }}.patch" ./common/
+          else
+            echo "SUSFS patch not found for this version combination"
+            exit 1
+          fi
+          
           cp ../kernel_patches/next/syscall_hooks.patch ./common/
-          cp ../susfs4ksu/kernel_patches/fs/* ./common/fs/
-          cp ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
-          if [ "${{ github.event.inputs.lz4kd }}" == "Open" ]; then
+          cp -r ../susfs4ksu/kernel_patches/fs/* ./common/fs/
+          cp -r ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
+          
+          if [[ "${{ github.event.inputs.lz4kd }}" == "Open" ]]; then
             # Copy lz4k from ShirkNeko
-            cp -r ../SukiSU_patch/other/zram/lz4k/include/linux/* ./common/include/linux
-            cp -r ../SukiSU_patch/other/zram/lz4k/lib/* ./common/lib
-            cp -r ../SukiSU_patch/other/zram/lz4k/crypto/* ./common/crypto
+            cp -r ../SukiSU_patch/other/zram/lz4k/include/linux/* ./common/include/linux/
+            cp -r ../SukiSU_patch/other/zram/lz4k/lib/* ./common/lib/
+            cp -r ../SukiSU_patch/other/zram/lz4k/crypto/* ./common/crypto/
             cp -r ../SukiSU_patch/other/zram/lz4k_oplus ./common/lib/
           fi
           
           cd ./common
-          patch -p1 < 50_add_susfs_in_gki-${{ github.event.inputs.ANDROID_VERSION }}-${{ github.event.inputs.KERNEL_VERSION }}.patch || true
-          cp ../../kernel_patches/69_hide_stuff.patch ./
-          patch -p1 -F 3 < 69_hide_stuff.patch
-          patch -p1 -F 3 < syscall_hooks.patch
-          if [ "${{ github.event.inputs.lz4kd }}" == "Open" ]; then
-            cp ../../SukiSU_patch/other/zram/zram_patch/${{ github.event.inputs.KERNEL_VERSION }}/lz4kd.patch ./
-            patch -p1 -F 3 < lz4kd.patch || true
-            cp ../../SukiSU_patch/other/zram/zram_patch/${{ github.event.inputs.KERNEL_VERSION }}/lz4k_oplus.patch ./
-            patch -p1 -F 3 < lz4k_oplus.patch || true
+          
+          # Apply patches with better error handling
+          if ! patch -p1 < "50_add_susfs_in_gki-${{ github.event.inputs.ANDROID_VERSION }}-${{ github.event.inputs.KERNEL_VERSION }}.patch"; then
+            echo "WARNING: SUSFS patch failed to apply cleanly"
           fi
           
-      - name: 🔧 Add sched_ext
+          if [[ -f "../../kernel_patches/69_hide_stuff.patch" ]]; then
+            cp ../../kernel_patches/69_hide_stuff.patch ./
+            if ! patch -p1 -F 3 < 69_hide_stuff.patch; then
+              echo "WARNING: Hide stuff patch failed to apply"
+            fi
+          fi
+          
+          if ! patch -p1 -F 3 < syscall_hooks.patch; then
+            echo "ERROR: Syscall hooks patch failed to apply"
+            exit 1
+          fi
+          
+          if [[ "${{ github.event.inputs.lz4kd }}" == "Open" ]]; then
+            if [[ -f "../../SukiSU_patch/other/zram/zram_patch/${{ github.event.inputs.KERNEL_VERSION }}/lz4kd.patch" ]]; then
+              cp "../../SukiSU_patch/other/zram/zram_patch/${{ github.event.inputs.KERNEL_VERSION }}/lz4kd.patch" ./
+              patch -p1 -F 3 < lz4kd.patch || echo "WARNING: lz4kd patch failed"
+            fi
+            
+            if [[ -f "../../SukiSU_patch/other/zram/zram_patch/${{ github.event.inputs.KERNEL_VERSION }}/lz4k_oplus.patch" ]]; then
+              cp "../../SukiSU_patch/other/zram/zram_patch/${{ github.event.inputs.KERNEL_VERSION }}/lz4k_oplus.patch" ./
+              patch -p1 -F 3 < lz4k_oplus.patch || echo "WARNING: lz4k_oplus patch failed"
+            fi
+          fi
+          
+      - name: 🎮 Add sched_ext (风驰游戏内核调度)
         if: ${{ github.event.inputs.sched_ext == 'true' }}
         run: |
          cd kernel_workspace/kernel_platform/
-         git clone https://github.com/HanKuCha/sched_ext.git
-         cp -r ./sched_ext/* ./common/kernel/sched
-         rm -rf ./sched_ext/.git
-         cd common/kernel/sched
+         git clone https://github.com/HanKuCha/sched_ext.git --depth=1
+         
+         # 验证sched_ext源码
+         if [[ ! -d "./sched_ext" ]]; then
+           echo "ERROR: Failed to clone sched_ext repository"
+           exit 1
+         fi
+         
+         echo "📋 Contents of sched_ext directory:"
+         ls -la ./sched_ext/
+         
+         # 创建目标目录
+         mkdir -p ./common/kernel/sched/ext
+         
+         # 安全地复制sched_ext文件，排除.git目录
+         find ./sched_ext -type f ! -path "*/.git/*" -exec cp {} ./common/kernel/sched/ \; 2>/dev/null || true
+         
+         # 如果存在ext子目录，单独处理
+         if [[ -d "./sched_ext/ext" ]]; then
+           cp -r ./sched_ext/ext/* ./common/kernel/sched/ext/ 2>/dev/null || true
+         fi
+         
+         # 清理临时目录
+         rm -rf ./sched_ext
+         
+         # 验证文件是否正确复制
+         if [[ -d "./common/kernel/sched/ext" ]] || [[ $(find ./common/kernel/sched/ -name "*sched*" -type f | wc -l) -gt 0 ]]; then
+           echo "✅ sched_ext files successfully copied"
+           echo "📋 Files in sched directory:"
+           ls -la ./common/kernel/sched/
+           if [[ -d "./common/kernel/sched/ext" ]]; then
+             echo "📋 Files in sched/ext directory:"
+             ls -la ./common/kernel/sched/ext/
+           fi
+         else
+           echo "⚠️ WARNING: sched_ext files may not have been copied properly, but continuing build..."
+         fi
 
-      - name: 🔧 Apply new hook & Add configuration
+      - name: 🔧 Apply kernel configurations (应用内核配置)
         run: |
           cd kernel_workspace/kernel_platform
-          # Add KSU configuration settings
-          echo "CONFIG_KSU=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KPM=y" >> ./common/arch/arm64/configs/gki_defconfig
-          # Add VFS configuration settings
-          echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_MANUAL_HOOK=y" >> ./common/arch/arm64/configs/gki_defconfig      
-          # Add SUSFS configuration settings
-          echo "CONFIG_KSU_SUSFS=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> ./common/arch/arm64/configs/gki_defconfig
-          # Add BBR
-          echo "CONFIG_TCP_CONG_ADVANCED=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_TCP_CONG_BBR=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_NET_SCH_FQ=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_TCP_CONG_BIC=n" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_TCP_CONG_WESTWOOD=n" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_TCP_CONG_HTCP=n" >> ./common/arch/arm64/configs/gki_defconfig
           
-          if [ "${{ github.event.inputs.lz4kd }}" == "Open" ]; then
-            # Add lz4kd
-            echo "CONFIG_ZSMALLOC=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_CRYPTO_LZ4HC=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_CRYPTO_LZ4K=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_CRYPTO_LZ4KD=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_CRYPTO_842=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_CRYPTO_LZ4K_OPLUS=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_ZRAM_WRITEBACK=y" >> ./common/arch/arm64/configs/gki_defconfig
+          # 基础KSU配置
+          cat >> ./common/arch/arm64/configs/gki_defconfig << 'EOF'
+          # KernelSU Configuration
+          CONFIG_KSU=y
+          CONFIG_KPM=y
+          CONFIG_KSU_MANUAL_HOOK=y
+          
+          # SUSFS Configuration
+          CONFIG_KSU_SUSFS=y
+          CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
+          CONFIG_KSU_SUSFS_SUS_PATH=y
+          CONFIG_KSU_SUSFS_SUS_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
+          CONFIG_KSU_SUSFS_SUS_KSTAT=y
+          CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n
+          CONFIG_KSU_SUSFS_TRY_UMOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
+          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
+          CONFIG_KSU_SUSFS_ENABLE_LOG=y
+          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
+          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
+          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+          CONFIG_KSU_SUSFS_SUS_SU=n
+          
+          # Network Performance
+          CONFIG_TCP_CONG_ADVANCED=y
+          CONFIG_TCP_CONG_BBR=y
+          CONFIG_NET_SCH_FQ=y
+          CONFIG_TCP_CONG_BIC=n
+          CONFIG_TCP_CONG_WESTWOOD=n
+          CONFIG_TCP_CONG_HTCP=n
+          EOF
+          
+          # sched_ext配置
+          if [[ "${{ github.event.inputs.sched_ext }}" == "true" ]]; then
+            cat >> ./common/arch/arm64/configs/gki_defconfig << 'EOF'
+          
+          # Sched_ext Configuration (风驰游戏内核调度)
+          CONFIG_SCHED_CLASS_EXT=y
+          CONFIG_SCHED_DEBUG=y
+          CONFIG_BPF=y
+          CONFIG_BPF_SYSCALL=y
+          CONFIG_BPF_JIT=y
+          CONFIG_BPF_JIT_ALWAYS_ON=y
+          CONFIG_CGROUP_BPF=y
+          CONFIG_BPF_EVENTS=y
+          EOF
+            echo "✅ sched_ext configuration added"
           fi
-          # Remove check_defconfig
+          
+          # lz4kd配置
+          if [[ "${{ github.event.inputs.lz4kd }}" == "Open" ]]; then
+            cat >> ./common/arch/arm64/configs/gki_defconfig << 'EOF'
+          
+          # LZ4KD Configuration
+          CONFIG_ZSMALLOC=y
+          CONFIG_CRYPTO_LZ4HC=y
+          CONFIG_CRYPTO_LZ4K=y
+          CONFIG_CRYPTO_LZ4KD=y
+          CONFIG_CRYPTO_842=y
+          CONFIG_CRYPTO_LZ4K_OPLUS=y
+          CONFIG_ZRAM_WRITEBACK=y
+          EOF
+            echo "✅ lz4kd configuration added"
+          fi
+          
+          # 移除defconfig检查
           sed -i 's/check_defconfig//' ./common/build.config.gki
+          
+          echo "📋 Final kernel configuration:"
+          tail -20 ./common/arch/arm64/configs/gki_defconfig
           
       - name: 🔨 Build Kernel (构建内核)
         run: |
-          if [ "${{ github.event.inputs.KERNEL_VERSION }}" == "6.1" ]; then
+          cd kernel_workspace/kernel_platform
+          
+          # 设置编译环境
+          export PATH="/usr/lib/ccache:$PATH"
+          
+          if [[ "${{ github.event.inputs.KERNEL_VERSION }}" == "6.1" ]]; then
+            # Kernel 6.1 构建
             export PATH="$GITHUB_WORKSPACE/kernel_workspace/kernel_platform/prebuilts/clang/host/linux-x86/clang-r487747c/bin:$PATH"
-            export PATH="/usr/lib/ccache:$PATH"
-            sudo apt install libelf-dev
-            cd kernel_workspace/kernel_platform/common
-            make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC=clang RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole LD=ld.lld  HOSTLD=ld.lld O=out KCFLAGS+=-O2 CONFIG_LTO_CLANG=y CONFIG_LTO_CLANG_THIN=y CONFIG_LTO_CLANG_FULL=n CONFIG_LTO_NONE=n gki_defconfig all
-          else
-            cd kernel_workspace
+            
+            cd common
+            echo "🔧 Building kernel 6.1 with Clang..."
+            make -j$(nproc --all) \
+              LLVM=1 \
+              ARCH=arm64 \
+              CROSS_COMPILE=aarch64-linux-gnu- \
+              CC=clang \
+              RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc \
+              PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole \
+              LD=ld.lld \
+              HOSTLD=ld.lld \
+              O=out \
+              KCFLAGS+=-O2 \
+              CONFIG_LTO_CLANG=y \
+              CONFIG_LTO_CLANG_THIN=y \
+              CONFIG_LTO_CLANG_FULL=n \
+              CONFIG_LTO_NONE=n \
+              gki_defconfig all
+              
+          elif [[ "${{ github.event.inputs.KERNEL_VERSION }}" == "5.15" ]] || [[ "${{ github.event.inputs.KERNEL_VERSION }}" == "5.10" ]]; then
+            # Kernel 5.15/5.10 构建
+            echo "🔧 Building kernel ${{ github.event.inputs.KERNEL_VERSION }} with oplus build script..."
+            cd ..
             LTO=thin ./kernel_platform/oplus/build/oplus_build_kernel.sh ${{ github.event.inputs.CPUD }} gki
+          else
+            echo "❌ Unsupported kernel version: ${{ github.event.inputs.KERNEL_VERSION }}"
+            exit 1
           fi
+          
+          echo "✅ Kernel build completed"
           
       - name: 📦 Package kernel to AnyKernel3 (打包内核到 AnyKernel3)
         run: |
           git clone https://github.com/Suxiaoqinx/AnyKernel3 --depth=1
           rm -rf ./AnyKernel3/.git
-          dir1="kernel_workspace/kernel_platform/out/msm-kernel-${{ github.event.inputs.CPUD }}-gki/dist/"
-          dir2="kernel_workspace/kernel_platform/bazel-out/k8-fastbuild/bin/msm-kernel/${{ github.event.inputs.CPUD }}_gki_kbuild_mixed_tree/"
-          dir3="kernel_workspace/kernel_platform/out/msm-${{ github.event.inputs.CPUD }}-${{ github.event.inputs.CPUD }}-gki/dist/"
-          dir4="kernel_workspace/kernel_platform/out/msm-kernel-${{ github.event.inputs.CPUD }}-gki/gki_kernel/common/arch/arm64/boot/"
-          dir5="kernel_workspace/kernel_platform/out/msm-${{ github.event.inputs.CPUD }}-${{ github.event.inputs.CPUD }}-gki/gki_kernel/common/arch/arm64/boot/"
-          target1="./AnyKernel3/"
-          target2="./kernel_workspace/kernel"
-
-          if find "$dir1" -name "Image" | grep -q "Image"; then
-            image_path="$dir1"Image
-          elif find "$dir2" -name "Image" | grep -q "Image"; then
-            image_path="$dir2"Image
-          elif find "$dir3" -name "Image" | grep -q "Image"; then
-            image_path="$dir3"Image
-          elif find "$dir4" -name "Image" | grep -q "Image"; then
-            image_path="$dir4"Image
-          elif find "$dir5" -name "Image" | grep -q "Image"; then
-            image_path="$dir5"Image
-          else
-            image_path=$(find "./kernel_workspace/kernel_platform/common/out/" -name "Image" | head -n 1)
-          fi
-
-          if [ -n "$image_path" ] && [ -f "$image_path" ]; then
-            mkdir -p "$dir1"
-            if [ "$(realpath "$image_path")" != "$(realpath "$dir1"Image)" ]; then
-              cp "$image_path" "$dir1"
-            else
-              echo "源文件与目标相同，跳过复制"
+          
+          # 搜索Image文件的可能位置
+          possible_dirs=(
+            "kernel_workspace/kernel_platform/out/msm-kernel-${{ github.event.inputs.CPUD }}-gki/dist/"
+            "kernel_workspace/kernel_platform/bazel-out/k8-fastbuild/bin/msm-kernel/${{ github.event.inputs.CPUD }}_gki_kbuild_mixed_tree/"
+            "kernel_workspace/kernel_platform/out/msm-${{ github.event.inputs.CPUD }}-${{ github.event.inputs.CPUD }}-gki/dist/"
+            "kernel_workspace/kernel_platform/out/msm-kernel-${{ github.event.inputs.CPUD }}-gki/gki_kernel/common/arch/arm64/boot/"
+            "kernel_workspace/kernel_platform/out/msm-${{ github.event.inputs.CPUD }}-${{ github.event.inputs.CPUD }}-gki/gki_kernel/common/arch/arm64/boot/"
+            "kernel_workspace/kernel_platform/common/out/arch/arm64/boot/"
+          )
+          
+          image_path=""
+          for dir in "${possible_dirs[@]}"; do
+            if [[ -f "${dir}Image" ]]; then
+              image_path="${dir}Image"
+              echo "✅ Found Image at: $image_path"
+              break
             fi
-            cp "$dir1"Image ./AnyKernel3/Image
+          done
+          
+          # 通用搜索
+          if [[ -z "$image_path" ]]; then
+            image_path=$(find "./kernel_workspace/kernel_platform/" -name "Image" -type f | head -n 1)
+          fi
+          
+          if [[ -n "$image_path" ]] && [[ -f "$image_path" ]]; then
+            # 确保目标目录存在
+            mkdir -p "kernel_workspace/kernel_platform/out/msm-kernel-${{ github.event.inputs.CPUD }}-gki/dist/"
+            target_dir="kernel_workspace/kernel_platform/out/msm-kernel-${{ github.event.inputs.CPUD }}-gki/dist/"
+            
+            # 复制到标准位置
+            if [[ "$(realpath "$image_path")" != "$(realpath "${target_dir}Image")" ]]; then
+              cp "$image_path" "${target_dir}Image"
+            fi
+            
+            # 复制到AnyKernel3
+            cp "${target_dir}Image" ./AnyKernel3/Image
+            echo "✅ Image successfully packaged"
+            
+            # 显示文件信息
+            ls -lh "${target_dir}Image"
+            ls -lh ./AnyKernel3/Image
           else
-            echo "未找到 Image 文件，构建可能失败"
+            echo "❌ ERROR: Image file not found, build may have failed"
+            echo "Searching for any kernel images..."
+            find "./kernel_workspace/kernel_platform/" -name "*Image*" -type f
             exit 1
           fi
          
@@ -307,19 +464,40 @@ jobs:
         if: ${{ github.event.inputs.KPM_ext == 'true' }}
         run: |
           cd kernel_workspace/kernel_platform/out/msm-kernel-${{ github.event.inputs.CPUD }}-gki/dist
+          echo "🔄 Downloading KPM patcher..."
           curl -LO https://github.com/ShirkNeko/SukiSU_KernelPatch_patch/releases/download/0.11.4/patch_linux
           chmod +x patch_linux
-          ./patch_linux
-          rm -f Image
-          mv oImage Image
-          cp Image $GITHUB_WORKSPACE/AnyKernel3/Image
-          cp Image $GITHUB_WORKSPACE/kernel_workspace/kernel
+          
+          if [[ -f "Image" ]]; then
+            echo "🔧 Applying KPM patch..."
+            ./patch_linux
+            if [[ -f "oImage" ]]; then
+              rm -f Image
+              mv oImage Image
+              cp Image $GITHUB_WORKSPACE/AnyKernel3/Image
+              echo "✅ KPM patch applied successfully"
+            else
+              echo "❌ KPM patch failed - oImage not found"
+              exit 1
+            fi
+          else
+            echo "❌ Image file not found for KPM patching"
+            exit 1
+          fi
 
-      - name: 🛠️ Downing Zram (下载Zram附加模块)
+      - name: 🛠️ Download Zram module (下载Zram附加模块)
         if: ${{ github.event.inputs.lz4kd == 'Open' }}
         run: |
           cd $GITHUB_WORKSPACE/AnyKernel3
+          echo "📥 Downloading zram.zip..."
           curl -LO https://raw.githubusercontent.com/Suxiaoqinx/kernel_manifest_OnePlus_Sukisu_Ultra/main/zram.zip
+          if [[ -f "zram.zip" ]]; then
+            echo "✅ zram.zip downloaded successfully"
+            ls -lh zram.zip
+          else
+            echo "❌ Failed to download zram.zip"
+            exit 1
+          fi
          
       - name: 📤 Upload AnyKernel3 with lz4kd
         if: ${{ github.event.inputs.lz4kd == 'Open' }}
@@ -341,11 +519,14 @@ jobs:
          name: Image_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}
          path: ./AnyKernel3/Image
          
-      - name: 📝 Find zram.ko & crypto_zstdn.ko
+      - name: 📝 Find kernel modules (查找内核模块)
         if: ${{ github.event.inputs.lz4kd == 'Open' }}
         run: |
-          find -name zram.ko
-          find -name crypto_zstdn.ko
+          echo "🔍 Searching for zram.ko..."
+          find . -name "zram.ko" -type f 2>/dev/null || echo "zram.ko not found"
+          
+          echo "🔍 Searching for crypto modules..."
+          find . -name "crypto_*.ko" -type f 2>/dev/null || echo "crypto modules not found"
           
       - name: 📤 Upload zram.ko
         if: ${{ github.event.inputs.lz4kd == 'Open' }}
@@ -353,3 +534,20 @@ jobs:
         with:
           name: zram.ko
           path: ./kernel_workspace/kernel_platform/common/out/drivers/block/zram/zram.ko
+        continue-on-error: true
+        
+      - name: 📊 Build Summary (构建总结)
+        run: |
+          echo "🎉 Build completed successfully!"
+          echo "📱 Device: ${{ github.event.inputs.FEIL }}"
+          echo "🔧 CPU: ${{ github.event.inputs.CPU }} (${{ github.event.inputs.CPUD }})"
+          echo "🤖 Android: ${{ github.event.inputs.ANDROID_VERSION }}"
+          echo "🐧 Kernel: ${{ github.event.inputs.KERNEL_VERSION }}"
+          echo "🎯 KSU Version: ${{ env.KSUVER }}"
+          echo "🗜️ LZ4KD: ${{ github.event.inputs.lz4kd }}"
+          echo "🎮 Sched_ext: ${{ github.event.inputs.sched_ext }}"
+          echo "🔐 KPM: ${{ github.event.inputs.KPM_ext }}"
+          
+          if [[ -f "./AnyKernel3/Image" ]]; then
+            echo "✅ Final Image size: $(du -h ./AnyKernel3/Image | cut -f1)"
+          fi
