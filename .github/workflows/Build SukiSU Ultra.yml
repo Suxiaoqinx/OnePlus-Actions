@@ -65,7 +65,7 @@ on:
       KERNEL_SUFFIX:
         description: '内核名称修改(可改中文和emoji)'
         required: true
-        default: '-Coolapk@Suxiaoqing'
+        default: '-xkool'
       KPM_ext:
        description: "是否启用KPM补丁修补"
        required: true
@@ -369,7 +369,6 @@ jobs:
           # Network Performance
           CONFIG_TCP_CONG_ADVANCED=y
           CONFIG_TCP_CONG_BBR=y
-          CONFIG_DEFAULT_BBR=y
           CONFIG_NET_SCH_FQ=y
           CONFIG_TCP_CONG_BIC=n
           CONFIG_TCP_CONG_WESTWOOD=n
@@ -576,11 +575,11 @@ jobs:
          name: AnyKernel3_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}
          path: ./AnyKernel3/*
          
-      - name: 📤 Upload Image
+      - name: 📤 Upload boot.img
         uses: actions/upload-artifact@v4
         with:
-         name: Image_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}
-         path: ./AnyKernel3/Image
+         name: boot.img
+         path: ./kernel_workspace/kernel_platform/out/msm-kernel-${{ github.event.inputs.CPUD }}-gki/dist/boot.img
          
       - name: 📝 Find kernel modules (查找内核模块)
         if: ${{ github.event.inputs.lz4kd == 'Open' }}
