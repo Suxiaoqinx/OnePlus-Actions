@@ -516,21 +516,6 @@ jobs:
           if [[ -f "./AnyKernel3/Image" ]]; then
             echo "✅ Final Image size: $(du -h ./AnyKernel3/Image | cut -f1)"
           fi
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      packages: write
-      actions: read
-      
-    steps:
-      - name: 下载 ZIP 工件
-        uses: actions/download-artifact@v4
-        with:
-          name: Kernel_ZIP_Artifacts
-          path: ./release_zips
           
       - name: 创建发布
         id: create_release
@@ -560,4 +545,4 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            release_zips/AnyKernel3_*.zip
+            AnyKernel3/AnyKernel3_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}
