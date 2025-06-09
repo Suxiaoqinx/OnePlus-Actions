@@ -465,63 +465,17 @@ jobs:
           if [[ -f "zram.zip" ]]; then
             echo "✅ zram.zip downloaded successfully"
             ls -lh zram.zip
+            zip -r ../AnyKernel3_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}.zip ./*
           else
             echo "❌ Failed to download zram.zip"
             exit 1
-          fi
-         
-      - name: 📤 Upload AnyKernel3 with lz4kd
-        if: ${{ github.event.inputs.lz4kd == 'Open' }}
-        uses: actions/upload-artifact@v4
-        with:
-         name: AnyKernel3_SukiSU_Ultra_lz4kd_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}
-         path: ./AnyKernel3/*
-         
-      - name: 📤 Upload AnyKernel3
-        if: ${{ github.event.inputs.lz4kd != 'Open' }}
-        uses: actions/upload-artifact@v4
-        with:
-         name: AnyKernel3_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}
-         path: ./AnyKernel3/*
-         
-      - name: 📝 Find kernel modules (查找内核模块)
-        if: ${{ github.event.inputs.lz4kd == 'Open' }}
-        run: |
-          echo "🔍 Searching for zram.ko..."
-          find . -name "zram.ko" -type f 2>/dev/null || echo "zram.ko not found"
-          
-          echo "🔍 Searching for crypto modules..."
-          find . -name "crypto_*.ko" -type f 2>/dev/null || echo "crypto modules not found"
-          
-      - name: 📤 Upload zram.ko
-        if: ${{ github.event.inputs.lz4kd == 'Open' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: zram.ko
-          path: ./kernel_workspace/kernel_platform/common/out/drivers/block/zram/zram.ko
-        continue-on-error: true
-        
-      - name: 📊 Build Summary (构建总结)
-        run: |
-          echo "🎉 Build completed successfully!"
-          echo "📱 Device: ${{ github.event.inputs.FEIL }}"
-          echo "🔧 CPU: ${{ github.event.inputs.CPU }} (${{ github.event.inputs.CPUD }})"
-          echo "🤖 Android: ${{ github.event.inputs.ANDROID_VERSION }}"
-          echo "🐧 Kernel: ${{ github.event.inputs.KERNEL_VERSION }}"
-          echo "🎯 KSU Version: ${{ env.KSUVER }}"
-          echo "🗜️ LZ4KD: ${{ github.event.inputs.lz4kd }}"
-          echo "🎮 Sched_ext: ${{ github.event.inputs.sched_ext }}"
-          echo "🔐 KPM: ${{ github.event.inputs.KPM_ext }}"
-          
-          if [[ -f "./AnyKernel3/Image" ]]; then
-            echo "✅ Final Image size: $(du -h ./AnyKernel3/Image | cut -f1)"
           fi
 
       - name: 上传 ZIP 工件
         uses: actions/upload-artifact@v4
         with:
-          name: AnyKernel3_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}.zip
-          path: AnyKernel3_*.zip
+          name: Kernel_ZIP_Artifacts
+          path: $GITHUB_WORKSPACE/*.zip
 
   release:
     needs: build
@@ -535,7 +489,7 @@ jobs:
       - name: 下载 ZIP 工件
         uses: actions/download-artifact@v4
         with:
-          name: AnyKernel3_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}.zip
+          name: Kernel_ZIP_Artifacts
           path: ./release_zips
           
       - name: 创建发布
