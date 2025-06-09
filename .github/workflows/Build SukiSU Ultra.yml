@@ -65,7 +65,7 @@ on:
       KERNEL_SUFFIX:
         description: '内核名称修改(可改中文和emoji)'
         required: true
-        default: '-xkool'
+        default: '-Coolapk@Suxiaoqing'
       KPM_ext:
        description: "是否启用KPM补丁修补"
        required: true
