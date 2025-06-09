@@ -304,7 +304,7 @@ jobs:
           CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
           CONFIG_KSU_SUSFS_SUS_SU=n
           
-          # Network Performance
+          # BBR
           CONFIG_TCP_CONG_ADVANCED=y
           CONFIG_TCP_CONG_BBR=y
           CONFIG_DEFAULT_BBR=y
@@ -313,32 +313,6 @@ jobs:
           CONFIG_TCP_CONG_WESTWOOD=n
           CONFIG_TCP_CONG_HTCP=n
           EOF
-          
-          # sched_ext配置
-          if [[ "${{ github.event.inputs.sched_ext }}" == "true" ]]; then
-            cat >> ./common/arch/arm64/configs/gki_defconfig << 'EOF'
-          
-          # BPF Support for sched_ext
-          CONFIG_BPF=y
-          CONFIG_BPF_SYSCALL=y
-          CONFIG_BPF_JIT=y
-          CONFIG_BPF_JIT_ALWAYS_ON=y
-          CONFIG_BPF_JIT_DEFAULT_ON=y
-          CONFIG_CGROUP_BPF=y
-          CONFIG_BPF_EVENTS=y
-          CONFIG_DEBUG_INFO_BTF=y
-          CONFIG_DEBUG_INFO_BTF_MODULES=y
-          
-          # Realme Specific Optimizations
-          CONFIG_SCHED_AUTOGROUP=y
-          CONFIG_SCHED_CORE=y
-          CONFIG_PSI=y
-          CONFIG_PSI_DEFAULT_DISABLED=n
-          CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y
-          CONFIG_CPU_FREQ_GOV_INTERACTIVE=y
-          EOF
-            echo "✅ Realme GT Neo6 Wind Gaming Scheduler configuration added"
-          fi
           
           # lz4kd配置
           if [[ "${{ github.event.inputs.lz4kd }}" == "Open" ]]; then
@@ -510,12 +484,6 @@ jobs:
          name: AnyKernel3_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}
          path: ./AnyKernel3/*
          
-      - name: 📤 Upload boot.img
-        uses: actions/upload-artifact@v4
-        with:
-         name: boot.img
-         path: ./kernel_workspace/kernel_platform/out/msm-kernel-${{ github.event.inputs.CPUD }}-gki/dist/boot.img
-         
       - name: 📝 Find kernel modules (查找内核模块)
         if: ${{ github.event.inputs.lz4kd == 'Open' }}
         run: |
@@ -548,3 +516,33 @@ jobs:
           if [[ -f "./AnyKernel3/Image" ]]; then
             echo "✅ Final Image size: $(du -h ./AnyKernel3/Image | cut -f1)"
           fi
+
+      - name: 创建发布
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: "${{ github.event.inputs.FEIL }}"
+          name: "${{ github.event.inputs.FEIL }}-${{ env.KSUVER }}"
+          body: |
+            ### 构建信息
+            - 📱 Device: ${{ github.event.inputs.FEIL }}
+            - 🔧 CPU: ${{ github.event.inputs.CPU }} (${{ github.event.inputs.CPUD }})
+            - 🐧 Kernel: ${{ github.event.inputs.KERNEL_VERSION }}
+            - 🎯 KSU Version: ${{ env.KSUVER }}
+            - 🗜️ LZ4KD: ${{ github.event.inputs.lz4kd }}
+            - 🎮 Sched_ext: ${{ github.event.inputs.sched_ext }}
+            - 🔐 KPM: ${{ github.event.inputs.KPM_ext }}
+            - 推荐系统：ColorOS 15 / RealmeUI 6.0
+            - SukiSU管理器下载：[SukiSU-Ultra](https://github.com/ShirkNeko/SukiSU-Ultra/releases)
+            ### ⏫️ 更新内容：
+            - 更新SukiSU Ultra至最新版本（${{ env.KSUVER }}）
+            - (预留)
+            ### 📋 安装方法 | Installation Guide
+            1. 若你的手机已经安装了第三方Recovery（如TWRP)，可下载对应机型的AnyKernel刷机包后进入Recovery模式，通过Recovery刷入刷机包后重启设备
+            2. 若你的手机之前已有 root 权限，可在手机上安装[HorizonKernelFlasher](https://github.com/libxzr/HorizonKernelFlasher/releases)，在HorizonKernelFlasher中刷入AnyKernel刷机包并重启
+            3. 若你之前已刷入SukiSU Ultra内核，且SukiSU Ultra管理器已更新至最新版本，可在SukiSU Ultra管理器中直接刷入AnyKernel刷机包并重启
+            ※※※刷写内核有风险，为防止出现意外导致手机变砖，在刷入内核前请务必用[KernelFlasher](https://github.com/capntrips/KernelFlasher)等软件备份boot等关键启动分区!※※※
+          draft: false
+          prerelease: false
+          files: |
+            release_zips/AnyKernel3_*.zip
