@@ -516,10 +516,25 @@ jobs:
           if [[ -f "./AnyKernel3/Image" ]]; then
             echo "✅ Final Image size: $(du -h ./AnyKernel3/Image | cut -f1)"
           fi
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      actions: read
+      
+    steps:
+      - name: 下载 ZIP 工件
+        uses: actions/download-artifact@v4
+        with:
+          name: AnyKernel3_SukiSU_Ultra_lz4kd_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}
+          path: ./release_zips
           
       - name: 创建发布
         id: create_release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v4
         with:
           tag_name: "${{ github.event.inputs.FEIL }}"
           name: "${{ github.event.inputs.FEIL }}-${{ env.KSUVER }}"
@@ -545,4 +560,4 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            AnyKernel3/AnyKernel3_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}
+            release_zips/AnyKernel3_*.zip
