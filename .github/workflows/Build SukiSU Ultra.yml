@@ -513,12 +513,6 @@ jobs:
          name: AnyKernel3_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}
          path: ./AnyKernel3/*
          
-      - name: 📤 Upload Image
-        uses: actions/upload-artifact@v4
-        with:
-         name: Image_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}
-         path: ./AnyKernel3/Image
-         
       - name: 📝 Find kernel modules (查找内核模块)
         if: ${{ github.event.inputs.lz4kd == 'Open' }}
         run: |
