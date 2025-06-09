@@ -517,6 +517,12 @@ jobs:
             echo "✅ Final Image size: $(du -h ./AnyKernel3/Image | cut -f1)"
           fi
 
+      - name: 上传 ZIP 工件
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kernel_ZIP_Artifacts
+          path: ./AnyKernel3/*.zip
+
   release:
     needs: build
     runs-on: ubuntu-latest
@@ -529,7 +535,7 @@ jobs:
       - name: 下载 ZIP 工件
         uses: actions/download-artifact@v4
         with:
-          name: AnyKernel3_SukiSU_Ultra_lz4kd_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}
+          name: Kernel_ZIP_Artifacts
           path: ./release_zips
           
       - name: 创建发布
