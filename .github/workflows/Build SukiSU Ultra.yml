@@ -535,7 +535,7 @@ jobs:
       - name: 下载 ZIP 工件
         uses: actions/download-artifact@v4
         with:
-          name: Kernel_ZIP_Artifacts
+          name: AnyKernel3_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}.zip
           path: ./release_zips
           
       - name: 创建发布
