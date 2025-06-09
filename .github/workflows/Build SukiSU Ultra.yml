@@ -65,7 +65,7 @@ on:
       KERNEL_SUFFIX:
         description: '内核名称修改(可改中文和emoji)'
         required: true
-        default: '-Coolapk@Suxiaoqing'
+        default: '-xkool'
       KPM_ext:
        description: "是否启用KPM补丁修补"
        required: true
@@ -288,6 +288,55 @@ jobs:
            echo "⚠️ WARNING: sched_ext files may not have been copied properly, but continuing build..."
          fi
 
+      - name: 🎮 Extract Wind Gaming Scheduler from Realme GT Neo6
+        if: ${{ github.event.inputs.sched_ext == 'true' }}
+        run: |
+          cd kernel_workspace/kernel_platform/
+          
+          # 克隆Realme GT Neo6内核源码
+          echo "📥 Cloning Realme GT Neo6 kernel source..."
+          git clone https://github.com/realme-kernel-opensource/realme_gtneo6-AndroidV-kernel-source.git realme_source --depth=1
+          
+          # 提取sched_ext相关文件
+          echo "📋 Extracting sched_ext files..."
+          if [[ -d "./realme_source/kernel/sched" ]]; then
+            # 创建目标目录
+            mkdir -p ./common/kernel/sched/ext
+            mkdir -p ./common/include/linux/sched
+            
+            # 复制核心调度器文件
+            if [[ -f "./realme_source/kernel/sched/ext.c" ]]; then
+              cp ./realme_source/kernel/sched/ext.c ./common/kernel/sched/
+              echo "✅ Copied ext.c"
+            fi
+            
+            # 复制头文件
+            if [[ -d "./realme_source/include/linux/sched" ]]; then
+              cp ./realme_source/include/linux/sched/ext.h ./common/include/linux/sched/ 2>/dev/null || true
+              echo "✅ Copied ext.h"
+            fi
+            
+            # 复制BPF相关文件
+            find ./realme_source -name "*sched_ext*" -type f -exec cp {} ./common/kernel/sched/ \; 2>/dev/null || true
+            echo "✅ Copied sched_ext related files"
+            
+            # 检查特定的游戏调度器
+            GAMING_SCHEDULERS=("scx_rustland" "scx_lavd" "scx_bpfland" "scx_simple")
+            for scheduler in "${GAMING_SCHEDULERS[@]}"; do
+              if find ./realme_source -name "$scheduler*" -type f | head -1 >/dev/null 2>&1; then
+                echo "🎮 Found gaming scheduler: $scheduler"
+                find ./realme_source -name "$scheduler*" -type f -exec cp {} ./common/kernel/sched/ \; 2>/dev/null || true
+              fi
+            done
+          else
+            echo "❌ Realme sched directory not found"
+            exit 1
+          fi
+          
+          # 清理临时目录
+          rm -rf ./realme_source
+          echo "✅ Realme GT Neo6 Wind Gaming Scheduler extracted successfully"
+
       - name: 🔧 Apply kernel configurations (应用内核配置)
         run: |
           cd kernel_workspace/kernel_platform
@@ -330,17 +379,30 @@ jobs:
           if [[ "${{ github.event.inputs.sched_ext }}" == "true" ]]; then
             cat >> ./common/arch/arm64/configs/gki_defconfig << 'EOF'
           
-          # Sched_ext Configuration (风驰游戏内核调度)
+          # Realme GT Neo6 Wind Gaming Scheduler Configuration
           CONFIG_SCHED_CLASS_EXT=y
           CONFIG_SCHED_DEBUG=y
+          
+          # BPF Support for sched_ext
           CONFIG_BPF=y
           CONFIG_BPF_SYSCALL=y
           CONFIG_BPF_JIT=y
           CONFIG_BPF_JIT_ALWAYS_ON=y
+          CONFIG_BPF_JIT_DEFAULT_ON=y
           CONFIG_CGROUP_BPF=y
           CONFIG_BPF_EVENTS=y
+          CONFIG_DEBUG_INFO_BTF=y
+          CONFIG_DEBUG_INFO_BTF_MODULES=y
+          
+          # Realme Specific Optimizations
+          CONFIG_SCHED_AUTOGROUP=y
+          CONFIG_SCHED_CORE=y
+          CONFIG_PSI=y
+          CONFIG_PSI_DEFAULT_DISABLED=n
+          CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y
+          CONFIG_CPU_FREQ_GOV_INTERACTIVE=y
           EOF
-            echo "✅ sched_ext configuration added"
+            echo "✅ Realme GT Neo6 Wind Gaming Scheduler configuration added"
           fi
           
           # lz4kd配置
@@ -512,6 +574,12 @@ jobs:
         with:
          name: AnyKernel3_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}
          path: ./AnyKernel3/*
+         
+      - name: 📤 Upload Image
+        uses: actions/upload-artifact@v4
+        with:
+         name: Image_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}
+         path: ./AnyKernel3/Image
          
       - name: 📝 Find kernel modules (查找内核模块)
         if: ${{ github.event.inputs.lz4kd == 'Open' }}
