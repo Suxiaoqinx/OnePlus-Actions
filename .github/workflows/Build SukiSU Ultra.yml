@@ -472,6 +472,7 @@ jobs:
 
       - name: 压缩并输出信息
         run: |
+          cd $GITHUB_WORKSPACE/AnyKernel3
           # 定义文件名变量
           zip_file="AnyKernel3_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}.zip"
     
