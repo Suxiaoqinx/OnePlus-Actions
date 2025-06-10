@@ -492,17 +492,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Kernel_ZIP_Artifacts
-          path: ${{ env.ZIP_FULL_PATH }}  # 使用完整路径
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      packages: write
-      actions: read
+          path: ${{ env.ZIP_FULL_PATH }}
       
-    steps:
       - name: 检查环境变量
         run: |
           echo "KSUVER: ${{ env.KSUVER }}"
@@ -553,4 +544,3 @@ jobs:
           files: ./release_zips/${{ env.ZIP_FILE_NAME }}
           # 确保其他设置正确
           generate_release_notes: false
-          token: ${{ secrets.GITHUB_TOKEN }}
