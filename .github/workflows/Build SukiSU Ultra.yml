@@ -465,18 +465,32 @@ jobs:
           if [[ -f "zram.zip" ]]; then
             echo "✅ zram.zip downloaded successfully"
             ls -lh zram.zip
-            zip -r ./AnyKernel3_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}.zip ./*
-            ls -lh AnyKernel3_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}.zip
           else
             echo "❌ Failed to download zram.zip"
             exit 1
           fi
 
+      - name: 压缩并输出信息
+        run: |
+          # 定义文件名变量
+          zip_file="AnyKernel3_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}.zip"
+    
+          # 执行压缩
+          echo "正在创建压缩包: $zip_file"
+          zip -r "./$zip_file" ./*
+    
+          # 获取完整路径并输出
+          full_path="$(pwd)/$zip_file"
+          echo "压缩包已创建在: $full_path"
+    
+          # 保存为环境变量供后续步骤使用
+          echo "ZIP_FULL_PATH=$full_path" >> $GITHUB_ENV
+
       - name: 上传 ZIP 工件
         uses: actions/upload-artifact@v4
         with:
           name: Kernel_ZIP_Artifacts
-          path: ${{ github.workspace }}/kernel_workspace/AnyKernel3/*.zip
+          path: ${{ github.event.ZIP_FULL_PATH }}
 
   release:
     needs: build
