@@ -460,6 +460,7 @@ jobs:
       - name: 🛠️ Download Zram module (下载Zram附加模块)
         if: ${{ github.event.inputs.lz4kd == 'Open' }}
         run: |
+          ls -lh ./AnyKernel3/AnyKernel3_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}.zip
           cd $GITHUB_WORKSPACE/AnyKernel3
           echo "📥 Downloading zram.zip..."
           curl -LO https://raw.githubusercontent.com/Suxiaoqinx/kernel_manifest_OnePlus_Sukisu_Ultra/main/zram.zip
@@ -486,10 +487,6 @@ jobs:
       actions: read
       
     steps:
-
-      - name: 🛠️ 查找所有zip文件并输出目录
-        run: |
-          find / -type f -name 'AnyKernel3_*.zip' 2>/dev/null -exec echo {} \;
     
       - name: 下载 ZIP 工件
         uses: actions/download-artifact@v4
