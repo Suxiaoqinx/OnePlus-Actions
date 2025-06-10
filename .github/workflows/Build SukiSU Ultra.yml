@@ -459,7 +459,6 @@ jobs:
       - name: 🛠️ Download Zram module (下载Zram附加模块)
         if: ${{ github.event.inputs.lz4kd == 'Open' }}
         run: |
-          ls -lh ./AnyKernel3/AnyKernel3_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}.zip
           cd $GITHUB_WORKSPACE/AnyKernel3
           echo "📥 Downloading zram.zip..."
           curl -LO https://raw.githubusercontent.com/Suxiaoqinx/kernel_manifest_OnePlus_Sukisu_Ultra/main/zram.zip
