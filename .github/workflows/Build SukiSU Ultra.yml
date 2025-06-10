@@ -486,12 +486,13 @@ jobs:
     
           # 保存为环境变量供后续步骤使用
           echo "ZIP_FULL_PATH=$full_path" >> $GITHUB_ENV
+          echo "ZIP_FILE_NAME=$zip_file" >> $GITHUB_ENV  # 新增保存文件名变量
 
       - name: 上传 ZIP 工件
         uses: actions/upload-artifact@v4
         with:
           name: Kernel_ZIP_Artifacts
-          path: ${{ github.event.ZIP_FULL_PATH }}
+          path: ${{ env.ZIP_FULL_PATH }}  # 使用完整路径
 
   release:
     needs: build
@@ -502,6 +503,10 @@ jobs:
       actions: read
       
     steps:
+      - name: 检查环境变量
+        run: |
+          echo "KSUVER: ${{ env.KSUVER }}"
+          echo "FEIL: ${{ github.event.inputs.FEIL }}"
     
       - name: 下载 ZIP 工件
         uses: actions/download-artifact@v4
@@ -509,10 +514,18 @@ jobs:
           name: Kernel_ZIP_Artifacts
           path: ./release_zips
           
+      # 检查下载的文件
+      - name: 列出下载的文件
+        run: |
+          echo "下载的文件列表:"
+          ls -lh ./release_zips
+          echo "环境变量 ZIP_FILE_NAME: ${{ env.ZIP_FILE_NAME }}"
+    
       - name: 创建发布
         id: create_release
         uses: softprops/action-gh-release@v1
         with:
+          # 添加或更新这些输入
           tag_name: "${{ github.event.inputs.FEIL }}"
           name: "${{ github.event.inputs.FEIL }}-${{ env.KSUVER }}"
           body: |
@@ -536,5 +549,8 @@ jobs:
             ※※※刷写内核有风险，为防止出现意外导致手机变砖，在刷入内核前请务必用[KernelFlasher](https://github.com/capntrips/KernelFlasher)等软件备份boot等关键启动分区!※※※
           draft: false
           prerelease: false
-          files: |
-            release_zips/AnyKernel3_*.zip
+          # 关键修复：使用动态文件名
+          files: ./release_zips/${{ env.ZIP_FILE_NAME }}
+          # 确保其他设置正确
+          generate_release_notes: false
+          token: ${{ secrets.GITHUB_TOKEN }}
