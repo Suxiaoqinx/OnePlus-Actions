@@ -465,7 +465,7 @@ jobs:
           if [[ -f "zram.zip" ]]; then
             echo "✅ zram.zip downloaded successfully"
             ls -lh zram.zip
-            zip -r ./AnyKernel3_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}.zip $GITHUB_WORKSPACE/AnyKernel3/*
+            zip -r ./AnyKernel3_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}.zip ./*
             ls -lh AnyKernel3_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}.zip
           else
             echo "❌ Failed to download zram.zip"
@@ -476,7 +476,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Kernel_ZIP_Artifacts
-          path: AnyKernel3_*.zip
+          path: $GITHUB_WORKSPACE/AnyKernel3_*.zip
 
   release:
     needs: build
