@@ -465,7 +465,7 @@ jobs:
           if [[ -f "zram.zip" ]]; then
             echo "✅ zram.zip downloaded successfully"
             ls -lh zram.zip
-            zip -r ./AnyKernel3_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}.zip ./*
+            zip -r ./AnyKernel3_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}.zip $GITHUB_WORKSPACE/AnyKernel3/*
             ls -lh AnyKernel3_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}.zip
           else
             echo "❌ Failed to download zram.zip"
