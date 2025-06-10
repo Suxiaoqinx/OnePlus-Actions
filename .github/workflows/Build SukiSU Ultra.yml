@@ -485,6 +485,11 @@ jobs:
       actions: read
       
     steps:
+
+      - name: 🛠️ 查找所有zip文件并输出目录
+        run: |
+          find / -type f -name 'AnyKernel3_*.zip' 2>/dev/null -exec echo {} \;
+    
       - name: 下载 ZIP 工件
         uses: actions/download-artifact@v4
         with:
