@@ -556,7 +556,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           # 添加或更新这些输入
-          tag_name: "${{ github.event.inputs.FEIL }}"
+          tag_name: "${{ github.event.inputs.FEIL }}-${{ env.TIME_FORM }}"
           name: "${{ github.event.inputs.FEIL }}-${{ env.KSUVER }}-${{ env.TIME_FORM }}"
           body: |
             ### 构建信息
