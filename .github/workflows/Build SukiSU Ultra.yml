@@ -470,55 +470,111 @@ jobs:
             exit 1
           fi
 
+      - name: 📤 Upload AnyKernel3 with lz4kd (上传 AnyKernel3)
+        if: ${{ github.event.inputs.lz4kd == 'Open' }}
+        uses: actions/upload-artifact@v4
+        with:
+         name: AnyKernel3_SukiSU_Ultra_lz4kd_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}
+         path: ./AnyKernel3/*
+         
+      - name: 📤 Upload AnyKernel3 (上传 AnyKernel3)
+        if: ${{ github.event.inputs.lz4kd != 'Open' }}
+        uses: actions/upload-artifact@v4
+        with:
+         name: AnyKernel3_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}
+         path: ./AnyKernel3/*
+         
+      - name: 📝 Find zram.ko & crypto_zstdn.ko (查找 zram.ko & crypto_zstdn.ko)
+        if: ${{ github.event.inputs.lz4kd == 'Open' }}
+        run: |
+          find -name zram.ko
+          find -name crypto_zstdn.ko
+          
+      # 条件上传 zram.ko
+      - name: 📤 Upload zram.ko (上传 zram.ko)
+        id: upload_zram # 添加ID以便后续引用
+        if: ${{ github.event.inputs.lz4kd == 'Open' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: zram.ko
+          path: ./kernel_workspace/kernel_platform/common/out/drivers/block/zram/zram.ko
+          retention-days: 7
+
+      # 压缩AnyKernel3目录
       - name: 压缩并输出信息
         run: |
           cd $GITHUB_WORKSPACE/AnyKernel3
-          # 定义文件名变量
           zip_file="AnyKernel3_SukiSU_Ultra_${{ env.KSUVER }}_${{ github.event.inputs.FEIL }}.zip"
-    
+          
+          # 检查是否有zram.ko上传并将其添加到压缩包中
+          if [ "${{ github.event.inputs.lz4kd }}" == 'Open' ]; then
+            echo "添加zram.ko到AnyKernel3/modules目录"
+            cp "${{ steps.upload_zram.outputs.file_path }}" modules/zram.ko
+          fi
+          
           # 执行压缩
           echo "正在创建压缩包: $zip_file"
           zip -r "./$zip_file" ./*
-    
+          
           # 获取完整路径并输出
           full_path="$(pwd)/$zip_file"
           echo "压缩包已创建在: $full_path"
-    
+          
           # 保存为环境变量供后续步骤使用
           echo "ZIP_FULL_PATH=$full_path" >> $GITHUB_ENV
-          echo "ZIP_FILE_NAME=$zip_file" >> $GITHUB_ENV  # 新增保存文件名变量
+          echo "ZIP_FILE_NAME=$zip_file" >> $GITHUB_ENV
 
+      # 上传整个AnyKernel3包
       - name: 上传 ZIP 工件
         uses: actions/upload-artifact@v4
         with:
           name: Kernel_ZIP_Artifacts
           path: ${{ env.ZIP_FULL_PATH }}
-      
-      - name: 检查环境变量
+          retention-days: 7
+
+      # 创建发布工作流
+      - name: 准备发布
         run: |
-          echo "KSUVER: ${{ env.KSUVER }}"
-          echo "FEIL: ${{ github.event.inputs.FEIL }}"
-    
-      - name: 下载 ZIP 工件
-        uses: actions/download-artifact@v4
-        with:
-          name: Kernel_ZIP_Artifacts
-          path: ./release_zips
+          # 创建保存文件的目录
+          mkdir -p release_assets
           
-      # 检查下载的文件
-      - name: 列出下载的文件
+          # 下载内核压缩包
+          echo "下载内核压缩包工件"
+          artifact-cli download --name Kernel_ZIP_Artifacts --path release_assets
+          
+          # 如果存在zram.ko，下载它
+          if [ "${{ github.event.inputs.lz4kd }}" == 'Open' ]; then
+            echo "下载zram.ko工件"
+            artifact-cli download --name zram.ko --path release_assets/modules
+          fi
+          
+          # 保存文件列表供发布使用
+          files_to_upload=$(find release_assets -type f | tr '\n' ',')
+          echo "FILES_TO_UPLOAD=$files_to_upload" >> $GITHUB_ENV
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      actions: read
+      
+    steps:
+      # 检查环境变量
+      - name: 列出可用文件
         run: |
-          echo "下载的文件列表:"
-          ls -lh ./release_zips
-          echo "环境变量 ZIP_FILE_NAME: ${{ env.ZIP_FILE_NAME }}"
-    
-      - name: 创建发布
+          echo "准备发布的文件:"
+          find . -name '*.zip' -o -name '*.ko'
+          echo "文件列表变量: $FILES_TO_UPLOAD"
+      
+      # 创建发布
+      - name: 创建内核发布
         id: create_release
         uses: softprops/action-gh-release@v1
         with:
-          # 添加或更新这些输入
-          tag_name: "${{ github.event.inputs.FEIL }}"
-          name: "${{ github.event.inputs.FEIL }}-${{ env.KSUVER }}"
+          tag_name: "${{ github.event.inputs.FEIL }}-${{ env.KSUVER }}"
+          name: "SukiSU Ultra ${{ env.KSUVER }} for ${{ github.event.inputs.FEIL }}"
           body: |
             ### 构建信息
             - 📱 Device: ${{ github.event.inputs.FEIL }}
@@ -540,7 +596,5 @@ jobs:
             ※※※刷写内核有风险，为防止出现意外导致手机变砖，在刷入内核前请务必用[KernelFlasher](https://github.com/capntrips/KernelFlasher)等软件备份boot等关键启动分区!※※※
           draft: false
           prerelease: false
-          # 关键修复：使用动态文件名
-          files: ./release_zips/${{ env.ZIP_FILE_NAME }}
-          # 确保其他设置正确
+          files: ${{ env.FILES_TO_UPLOAD }}  # 使用动态文件列表
           generate_release_notes: false
