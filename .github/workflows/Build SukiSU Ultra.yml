@@ -467,25 +467,28 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE/AnyKernel3
           LATEST_RUN_ID=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/sidex15/susfs4ksu-module/actions/runs?status=success" | \
-            jq -r '.workflow_runs[] | select(.head_branch == "v1.5.2+") | .id' | head -n 1)
+          "https://api.github.com/repos/sidex15/susfs4ksu-module/actions/runs?status=success" | \
+          jq -r '.workflow_runs[] | select(.head_branch == "v1.5.2+") | .id' | head -n 1)
 
           if [ -z "$LATEST_RUN_ID" ]; then
-            echo "No successful run found for branch v1.5.2+"
-            exit 1
+              echo "No successful run found for branch v1.5.2+"
+              exit 1
           fi
 
           ARTIFACT_URL=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/sidex15/susfs4ksu-module/actions/runs/$LATEST_RUN_ID/artifacts" | jq -r '.artifacts[0].archive_download_url')
+          "https://api.github.com/repos/sidex15/susfs4ksu-module/actions/runs/$LATEST_RUN_ID/artifacts" | jq -r '.artifacts[0].archive_download_url')
 
-          curl -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -o ksu_module_susfs.zip "$ARTIFACT_URL"
+          # 下载文件并重命名为 ksu_module_susfs.zip
+          curl -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -o temp_susfs.zip "$ARTIFACT_URL"
+          mv temp_susfs.zip ksu_module_susfs.zip
 
       # 下载 SUSFS 模块（Release）
       - name: Download Latest SUSFS Module from Release
         if: ${{ github.event.inputs.SUSFS_CI == 'false' }}
         run: |
           cd $GITHUB_WORKSPACE/AnyKernel3
-          wget https://github.com/sidex15/ksu_module_susfs/releases/latest/download/ksu_module_susfs_1.5.2+.zip
+          wget https://github.com/sidex15/ksu_module_susfs/releases/latest/download/ksu_module_susfs_1.5.2+.zip -O temp_susfs.zip
+          mv temp_susfs.zip ksu_module_susfs.zip
 
       - name: 🛠️ Download Zram module (下载Zram附加模块)
         if: ${{ github.event.inputs.lz4kd == 'Open' }}
