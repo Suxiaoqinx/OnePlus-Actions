@@ -185,7 +185,7 @@ jobs:
       - name: ⚙️ Set up SukiSU Ultra (配置 SukiSU Ultra)
         run: |
           cd kernel_workspace/kernel_platform
-          curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-dev
+          curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
           cd ./KernelSU
           KSU_VERSION=$(expr $(/usr/bin/git rev-list --count main) "+" 10606)
           echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
@@ -351,7 +351,7 @@ jobs:
           if [[ "${{ github.event.inputs.KERNEL_VERSION }}" == "6.1" ]]; then
             # Kernel 6.1 构建
             export PATH="$GITHUB_WORKSPACE/kernel_workspace/kernel_platform/prebuilts/clang/host/linux-x86/clang-r487747c/bin:$PATH"
-            
+            export PATH="/usr/lib/ccache:$PATH"
             cd common
             echo "🔧 Building kernel 6.1 with Clang..."
             make -j$(nproc --all) \
