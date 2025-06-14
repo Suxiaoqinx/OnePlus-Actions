@@ -254,31 +254,14 @@ jobs:
       - name: 🎮 Add sched_ext (风驰游戏内核调度)
         if: ${{ github.event.inputs.sched_ext == 'true' }}
         run: |
-         cd kernel_workspace/kernel_platform/
-         git clone https://github.com/HanKuCha/sched_ext.git --depth=1
+          cd kernel_workspace/kernel_platform/
+          git clone https://github.com/HanKuCha/sched_ext.git
+          cp -r ./sched_ext/* ./common/kernel/sched
+          rm -rf ./sched_ext/.git
+          cd common/kernel/sched  
          
-         # 验证sched_ext源码
-         if [[ ! -d "./sched_ext" ]]; then
-           echo "ERROR: Failed to clone sched_ext repository"
-           exit 1
-         fi
-         
-         echo "📋 Contents of sched_ext directory:"
-         ls -la ./sched_ext/
-         
-         # 创建目标目录
-         mkdir -p ./common/kernel/sched/ext
-         
-         # 安全地复制sched_ext文件，排除.git目录
-         find ./sched_ext -type f ! -path "*/.git/*" -exec cp {} ./common/kernel/sched/ \; 2>/dev/null || true
-         
-         # 如果存在ext子目录，单独处理
-         if [[ -d "./sched_ext/ext" ]]; then
-           cp -r ./sched_ext/ext/* ./common/kernel/sched/ext/ 2>/dev/null || true
-         fi
-         
-         # 清理临时目录
-         rm -rf ./sched_ext
+          # 清理临时目录
+          rm -rf ./sched_ext
 
       - name: 🔧 Apply kernel configurations (应用内核配置)
         run: |
