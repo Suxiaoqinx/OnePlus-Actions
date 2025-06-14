@@ -221,10 +221,6 @@ jobs:
           fi
           
           cd ./common
-
-          curl -LO https://raw.githubusercontent.com/ferstar/kernel_manifest/realme/sm8650/patches/001-lz4.patch
-          curl -LO https://raw.githubusercontent.com/ferstar/kernel_manifest/realme/sm8650/patches/lz4armv8.S
-          patch -p1 -F 3 < 001-lz4.patch || echo "WARNING: lz4 patch failed"
           
           # Apply patches with better error handling
           if ! patch -p1 < "50_add_susfs_in_gki-${{ github.event.inputs.ANDROID_VERSION }}-${{ github.event.inputs.KERNEL_VERSION }}.patch"; then
